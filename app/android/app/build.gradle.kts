@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.localailauncher.local_ai_launcher"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
