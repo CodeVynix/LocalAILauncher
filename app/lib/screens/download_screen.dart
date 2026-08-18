@@ -74,13 +74,13 @@ class _DownloadScreenState extends ConsumerState<DownloadScreen>
   }
 
   Future<void> _importCustomModel() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: ['gguf'],
     );
 
-    if (result != null && result.files.single.path != null) {
-      final path = result.files.single.path!;
+    if (result != null && result.path != null) {
+      final path = result.path!;
       final validation = await GgufValidator.validateFile(path);
 
       if (!validation.isValid) {
