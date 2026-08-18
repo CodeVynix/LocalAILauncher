@@ -7,6 +7,7 @@ import '../models/model_info.dart';
 
 class ShelfServerService {
   HttpServer? _server;
+  String? _wifiIp;
   final List<ModelInfo> Function() _getModels;
   final List<Map<String, dynamic>> Function() _getChatHistory;
   final Future<void> Function(String message) _onSendMessage;
@@ -19,7 +20,8 @@ class ShelfServerService {
         _getChatHistory = getChatHistory,
         _onSendMessage = onSendMessage;
 
-  Future<void> start(int port) async {
+  Future<void> start(int port, {String? wifiIp}) async {
+    _wifiIp = wifiIp;
     final router = Router();
 
     router.get('/', _handleIndex);
@@ -37,13 +39,18 @@ class ShelfServerService {
   Future<void> stop() async {
     await _server?.close();
     _server = null;
+    _wifiIp = null;
   }
 
   bool get isRunning => _server != null;
 
   String? get url {
     if (_server == null) return null;
-    return 'http://${_server!.address.host}:${_server!.port}';
+    final port = _server!.port;
+    if (_wifiIp != null && _wifiIp!.isNotEmpty) {
+      return 'http://$_wifiIp:$port';
+    }
+    return null;
   }
 
   shelf.Response _handleIndex(shelf.Request request) {

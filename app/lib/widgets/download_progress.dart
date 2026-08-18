@@ -4,11 +4,15 @@ import '../services/download_service.dart';
 class DownloadProgressWidget extends StatelessWidget {
   final DownloadProgress progress;
   final VoidCallback onCancel;
+  final VoidCallback? onPause;
+  final VoidCallback? onResume;
 
   const DownloadProgressWidget({
     super.key,
     required this.progress,
     required this.onCancel,
+    this.onPause,
+    this.onResume,
   });
 
   @override
@@ -29,24 +33,50 @@ class DownloadProgressWidget extends StatelessWidget {
               style: const TextStyle(fontSize: 12),
             ),
             Text(
-              progress.speedDisplay,
-              style: const TextStyle(
+              progress.isPaused
+                  ? 'Paused'
+                  : progress.isCancelled
+                      ? 'Cancelled'
+                      : progress.speedDisplay,
+              style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey,
+                color: progress.isPaused
+                    ? Colors.orange
+                    : progress.isCancelled
+                        ? Colors.red
+                        : Colors.grey,
               ),
             ),
           ],
         ),
         const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton(
-            onPressed: onCancel,
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Colors.red),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            if (!progress.isPaused && onPause != null)
+              TextButton(
+                onPressed: onPause,
+                child: const Text(
+                  'Pause',
+                  style: TextStyle(color: Colors.orange),
+                ),
+              ),
+            if (progress.isPaused && onResume != null)
+              TextButton(
+                onPressed: onResume,
+                child: const Text(
+                  'Resume',
+                  style: TextStyle(color: Colors.green),
+                ),
+              ),
+            TextButton(
+              onPressed: onCancel,
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.red),
+              ),
             ),
-          ),
+          ],
         ),
       ],
     );

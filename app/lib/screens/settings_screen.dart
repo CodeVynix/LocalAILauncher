@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:network_info_plus/network_info_plus.dart';
 import '../providers/settings_provider.dart';
 import '../providers/model_provider.dart';
 import '../services/shelf_server.dart';
+import '../services/device_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -13,6 +15,8 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   ShelfServerService? _serverService;
+  String _hardwareTier = 'Unknown';
+  int _roundedRamGb = 0;
 
   @override
   void initState() {
@@ -22,12 +26,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       getChatHistory: () => [],
       onSendMessage: (msg) async {},
     );
+    _loadHardwareInfo();
+  }
+
+  Future<void> _loadHardwareInfo() async {
+    final info = await DeviceService.getDeviceInfo();
+    setState(() {
+      _hardwareTier = info.hardwareTier;
+      _roundedRamGb = info.roundedRamGb;
+    });
   }
 
   void _toggleWebServer(bool enabled) async {
     if (enabled) {
       try {
-        await _serverService!.start(8080);
+        final wifiIp = await NetworkInfo().getWifiIP();
+        if (wifiIp == null || wifiIp.isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'WiFi not connected. The server will be accessible at 0.0.0.0:8080 only on this device.',
+                ),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        }
+        await _serverService!.start(8080, wifiIp: wifiIp);
         ref.read(settingsProvider.notifier).setWebServerEnabled(true);
         ref.read(settingsProvider.notifier).setWebServerUrl(
               _serverService!.url ?? '',
@@ -83,11 +109,72 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: [
+          _buildHardwareSection(),
+          const Divider(),
           _buildTemperatureSection(settings),
           const Divider(),
           _buildWebServerSection(settings),
           const Divider(),
           _buildModelManagementSection(models, selectedModel),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHardwareSection() {
+    final Color tierColor;
+    switch (_hardwareTier) {
+      case 'Excellent':
+        tierColor = Colors.green;
+        break;
+      case 'Good':
+        tierColor = Colors.blue;
+        break;
+      default:
+        tierColor = Colors.orange;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Device Hardware',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(Icons.memory, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'RAM: ${_roundedRamGb}GB',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: tierColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  _hardwareTier,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Recommended models are filtered based on your device capabilities.',
+            style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+          ),
         ],
       ),
     );

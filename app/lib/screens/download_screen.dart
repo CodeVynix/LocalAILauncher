@@ -9,6 +9,7 @@ import '../services/device_service.dart';
 import '../services/recommended_models.dart';
 import '../services/download_service.dart';
 import '../services/gguf_validator.dart';
+import '../services/notification_service.dart';
 import '../providers/model_provider.dart';
 import '../widgets/model_card.dart';
 
@@ -27,6 +28,7 @@ class _DownloadScreenState extends ConsumerState<DownloadScreen>
   final DownloadService _downloadService = DownloadService();
   String? _downloadingModelId;
   DownloadProgress? _currentProgress;
+  bool _notificationPermissionRequested = false;
 
   @override
   void initState() {
@@ -40,12 +42,17 @@ class _DownloadScreenState extends ConsumerState<DownloadScreen>
     setState(() {
       _deviceInfo = info;
       _recommendedModels = RecommendedModels.getRecommendedForDevice(
-        info.totalRamGb,
+        info.roundedRamGb,
       );
     });
   }
 
   Future<void> _downloadModel(ModelInfo model) async {
+    if (!_notificationPermissionRequested) {
+      _notificationPermissionRequested = true;
+      NotificationService.requestNotificationPermission();
+    }
+
     setState(() {
       _downloadingModelId = model.id;
       _currentProgress = null;
@@ -58,7 +65,7 @@ class _DownloadScreenState extends ConsumerState<DownloadScreen>
       },
     );
 
-    if (result.bytesDownloaded > 0 && !result.isCancelled) {
+    if (result.bytesDownloaded > 0 && !result.isCancelled && !result.isPaused) {
       final modelsDir = await _getModelsDirectory();
       final localPath = '${modelsDir.path}/${model.fileName}';
       final downloadedFile = File(localPath);
@@ -67,6 +74,31 @@ class _DownloadScreenState extends ConsumerState<DownloadScreen>
       }
     }
 
+    if (!result.isPaused) {
+      setState(() {
+        _downloadingModelId = null;
+        _currentProgress = null;
+      });
+    }
+  }
+
+  void _pauseModelDownload() {
+    if (_downloadingModelId != null) {
+      _downloadService.pauseDownload(_downloadingModelId!);
+    }
+  }
+
+  void _resumeModelDownload() {
+    if (_downloadingModelId != null) {
+      _downloadService.resumeDownload(_downloadingModelId!);
+      _downloadModel(
+        _recommendedModels.firstWhere((m) => m.id == _downloadingModelId),
+      );
+    }
+  }
+
+  void _cancelModelDownload() {
+    _downloadService.cancelDownload();
     setState(() {
       _downloadingModelId = null;
       _currentProgress = null;
@@ -79,8 +111,9 @@ class _DownloadScreenState extends ConsumerState<DownloadScreen>
       allowedExtensions: ['gguf'],
     );
 
-    if (result != null && result.path != null) {
-      final path = result.path!;
+    if (result != null) {
+      final path = result.path;
+      if (path == null) return;
       final validation = await GgufValidator.validateFile(path);
 
       if (!validation.isValid) {
@@ -177,7 +210,7 @@ class _DownloadScreenState extends ConsumerState<DownloadScreen>
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Device: ${_deviceInfo!.totalRamGb}GB RAM, ${_deviceInfo!.cpuCores} CPU cores',
+                  'Device: ${_deviceInfo!.roundedRamGb}GB RAM (${_deviceInfo!.hardwareTier}), ${_deviceInfo!.cpuCores} CPU cores',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
@@ -203,7 +236,17 @@ class _DownloadScreenState extends ConsumerState<DownloadScreen>
                       isDownloading: isDownloading,
                       progress: isDownloading ? _currentProgress : null,
                       onDownload: () => _downloadModel(model),
-                      onCancel: () => _downloadService.cancelDownload(),
+                      onPause: isDownloading &&
+                              _currentProgress != null &&
+                              !_currentProgress!.isPaused
+                          ? _pauseModelDownload
+                          : null,
+                      onResume: isDownloading &&
+                              _currentProgress != null &&
+                              _currentProgress!.isPaused
+                          ? _resumeModelDownload
+                          : null,
+                      onCancel: _cancelModelDownload,
                     );
                   },
                 ),

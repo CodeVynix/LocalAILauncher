@@ -9,6 +9,8 @@ class ModelCard extends StatelessWidget {
   final DownloadProgress? progress;
   final VoidCallback onDownload;
   final VoidCallback onCancel;
+  final VoidCallback? onPause;
+  final VoidCallback? onResume;
 
   const ModelCard({
     super.key,
@@ -17,6 +19,8 @@ class ModelCard extends StatelessWidget {
     this.progress,
     required this.onDownload,
     required this.onCancel,
+    this.onPause,
+    this.onResume,
   });
 
   @override
@@ -100,7 +104,12 @@ class ModelCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             if (isDownloading && progress != null)
-              DownloadProgressWidget(progress: progress!, onCancel: onCancel)
+              DownloadProgressWidget(
+                progress: progress!,
+                onPause: onPause,
+                onResume: onResume,
+                onCancel: onCancel,
+              )
             else
               SizedBox(
                 width: double.infinity,
