@@ -4,7 +4,6 @@ app/.dart_tool/
 app/.packages
 app/.pub-cache/
 app/.pub/
-app/pubspec.lock
 app/.flutter-plugins
 app/.flutter-plugins-dependencies
 
