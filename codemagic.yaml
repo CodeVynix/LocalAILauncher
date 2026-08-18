@@ -26,8 +26,8 @@ workflows:
           cp -r Runner.app Payload/
           zip -r ../ipa/LocalAILauncher-unsigned.ipa Payload
     artifacts:
-      - app/build/ios/ipa/*.ipa
-      - app/build/ios/iphoneos/*.app
+      - build/ios/ipa/*.ipa
+      - build/ios/iphoneos/*.app
     publishing:
       email:
         recipients:
