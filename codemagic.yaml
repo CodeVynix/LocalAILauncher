@@ -1,0 +1,37 @@
+workflows:
+  ios-unsigned-ipa:
+    name: iOS Unsigned IPA Build
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    working_directory: app
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Flutter pub get
+        script: flutter pub get
+      - name: Install pods
+        script: |
+          cd ios
+          pod install
+      - name: Flutter build iOS (no codesign)
+        script: |
+          flutter build ios --release --no-codesign
+      - name: Create unsigned IPA
+        script: |
+          mkdir -p build/ios/ipa
+          cd build/ios/iphoneos
+          mkdir -p Payload
+          cp -r Runner.app Payload/
+          zip -r ../ipa/LocalAILauncher-unsigned.ipa Payload
+    artifacts:
+      - app/build/ios/ipa/*.ipa
+      - app/build/ios/iphoneos/*.app
+    publishing:
+      email:
+        recipients:
+          - noyes6926@gmail.com
+        notify:
+          success: true
+          failure: true
