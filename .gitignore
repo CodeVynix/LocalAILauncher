@@ -55,7 +55,6 @@ Thumbs.db
 .env
 .env.*
 *.gguf
-models/
 
 # Misc
 *.log
