@@ -29,6 +29,7 @@ class _DownloadScreenState extends ConsumerState<DownloadScreen>
   String? _downloadingModelId;
   DownloadProgress? _currentProgress;
   bool _notificationPermissionRequested = false;
+  bool _isStartingDownload = false;
 
   @override
   void initState() {
@@ -48,37 +49,48 @@ class _DownloadScreenState extends ConsumerState<DownloadScreen>
   }
 
   Future<void> _downloadModel(ModelInfo model) async {
+    if (_isStartingDownload || _downloadingModelId != null) return;
+
     if (!_notificationPermissionRequested) {
       _notificationPermissionRequested = true;
       NotificationService.requestNotificationPermission();
     }
 
     setState(() {
+      _isStartingDownload = true;
       _downloadingModelId = model.id;
       _currentProgress = null;
     });
 
-    final result = await _downloadService.downloadModel(
-      model,
-      (progress) {
-        setState(() => _currentProgress = progress);
-      },
-    );
+    try {
+      final result = await _downloadService.downloadModel(
+        model,
+        (progress) {
+          setState(() => _currentProgress = progress);
+        },
+      );
 
-    if (result.bytesDownloaded > 0 && !result.isCancelled && !result.isPaused) {
-      final modelsDir = await _getModelsDirectory();
-      final localPath = '${modelsDir.path}/${model.fileName}';
-      final downloadedFile = File(localPath);
-      if (await downloadedFile.exists()) {
-        await ref.read(modelListProvider.notifier).addModel(model, localPath);
+      if (result.bytesDownloaded > 0 &&
+          !result.isCancelled &&
+          !result.isPaused) {
+        final modelsDir = await _getModelsDirectory();
+        final localPath = '${modelsDir.path}/${model.fileName}';
+        final downloadedFile = File(localPath);
+        if (await downloadedFile.exists()) {
+          await ref
+              .read(modelListProvider.notifier)
+              .addModel(model, localPath);
+        }
       }
-    }
 
-    if (!result.isPaused) {
-      setState(() {
-        _downloadingModelId = null;
-        _currentProgress = null;
-      });
+      if (!result.isPaused) {
+        setState(() {
+          _downloadingModelId = null;
+          _currentProgress = null;
+        });
+      }
+    } finally {
+      setState(() => _isStartingDownload = false);
     }
   }
 
@@ -89,12 +101,8 @@ class _DownloadScreenState extends ConsumerState<DownloadScreen>
   }
 
   void _resumeModelDownload() {
-    if (_downloadingModelId != null) {
-      _downloadService.resumeDownload(_downloadingModelId!);
-      _downloadModel(
-        _recommendedModels.firstWhere((m) => m.id == _downloadingModelId),
-      );
-    }
+    if (_downloadingModelId == null) return;
+    _downloadService.resumeDownload(_downloadingModelId!);
   }
 
   void _cancelModelDownload() {

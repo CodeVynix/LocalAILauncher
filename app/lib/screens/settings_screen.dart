@@ -17,6 +17,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   ShelfServerService? _serverService;
   String _hardwareTier = 'Unknown';
   int _roundedRamGb = 0;
+  String _cpuModel = '';
+  int _freeStorageMb = 0;
+  int _totalStorageMb = 0;
+  bool _isTogglingServer = false;
 
   @override
   void initState() {
@@ -31,15 +35,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _loadHardwareInfo() async {
     final info = await DeviceService.getDeviceInfo();
+    final storage = await DeviceService.getStorageInfo();
     setState(() {
       _hardwareTier = info.hardwareTier;
       _roundedRamGb = info.roundedRamGb;
+      _cpuModel = info.cpuModel;
+      _freeStorageMb = storage.freeMb;
+      _totalStorageMb = storage.totalMb;
     });
   }
 
+  String get _hardwareTierAdjusted {
+    // Flag "Limited" if storage is critically low, regardless of RAM tier.
+    // Smallest recommended model is ~1 GB; flag if free space is < 1.5 GB.
+    const minStorageForModelsMb = 1536;
+    if (_freeStorageMb > 0 && _freeStorageMb < minStorageForModelsMb) {
+      return 'Limited';
+    }
+    return _hardwareTier;
+  }
+
   void _toggleWebServer(bool enabled) async {
-    if (enabled) {
-      try {
+    if (_isTogglingServer) return;
+
+    setState(() => _isTogglingServer = true);
+
+    try {
+      if (enabled) {
         final wifiIp = await NetworkInfo().getWifiIP();
         if (wifiIp == null || wifiIp.isEmpty) {
           if (mounted) {
@@ -58,20 +80,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ref.read(settingsProvider.notifier).setWebServerUrl(
               _serverService!.url ?? '',
             );
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to start server: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+      } else {
+        await _serverService!.stop();
+        ref.read(settingsProvider.notifier).setWebServerEnabled(false);
+        ref.read(settingsProvider.notifier).setWebServerUrl('');
       }
-    } else {
-      await _serverService!.stop();
-      ref.read(settingsProvider.notifier).setWebServerEnabled(false);
-      ref.read(settingsProvider.notifier).setWebServerUrl('');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to start server: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isTogglingServer = false);
     }
   }
 
@@ -122,8 +146,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Widget _buildHardwareSection() {
+    final tier = _hardwareTierAdjusted;
     final Color tierColor;
-    switch (_hardwareTier) {
+    switch (tier) {
       case 'Excellent':
         tierColor = Colors.green;
         break;
@@ -134,6 +159,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         tierColor = Colors.orange;
     }
 
+    final storageDisplay = _totalStorageMb > 0
+        ? '${(_freeStorageMb / 1024).toStringAsFixed(1)} GB free / ${(_totalStorageMb / 1024).toStringAsFixed(0)} GB'
+        : 'Unknown';
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -143,7 +172,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             'Device Hardware',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
+          const SizedBox(height: 12),
+          // CPU
+          Row(
+            children: [
+              const Icon(Icons.developer_board, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _cpuModel.isNotEmpty ? _cpuModel : 'CPU: Unknown',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
+          // RAM + tier
           Row(
             children: [
               const Icon(Icons.memory, size: 20),
@@ -154,19 +198,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               const SizedBox(width: 12),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: tierColor,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  _hardwareTier,
+                  tier,
                   style: const TextStyle(
                     fontSize: 12,
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Storage
+          Row(
+            children: [
+              const Icon(Icons.storage, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Storage: $storageDisplay',
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -246,7 +303,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               'Serve the app as a webpage on your local network',
             ),
             value: settings.webServerEnabled,
-            onChanged: _toggleWebServer,
+            onChanged: _isTogglingServer ? null : _toggleWebServer,
+            secondary: _isTogglingServer
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : null,
           ),
           if (settings.webServerEnabled && settings.webServerUrl.isNotEmpty)
             Container(

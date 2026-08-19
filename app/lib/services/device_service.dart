@@ -1,7 +1,15 @@
 import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:disk_usage/disk_usage.dart';
 import 'package:flutter/services.dart';
 import '../models/device_info.dart';
+
+class StorageInfo {
+  final int freeMb;
+  final int totalMb;
+
+  const StorageInfo({required this.freeMb, required this.totalMb});
+}
 
 class DeviceService {
   static const _channel = MethodChannel('com.localailauncher/device_info');
@@ -40,6 +48,19 @@ class DeviceService {
       platform: Platform.operatingSystem,
       osVersion: '',
     );
+  }
+
+  static Future<StorageInfo> getStorageInfo() async {
+    try {
+      final freeSpace = await DiskUsage.freeSpace();
+      final totalSpace = await DiskUsage.totalSpace();
+      return StorageInfo(
+        freeMb: ((freeSpace ?? 0) / 1048576).round(),
+        totalMb: ((totalSpace ?? 0) / 1048576).round(),
+      );
+    } catch (e) {
+      return const StorageInfo(freeMb: 0, totalMb: 0);
+    }
   }
 
   static Future<int> _getIosRamBytes() async {

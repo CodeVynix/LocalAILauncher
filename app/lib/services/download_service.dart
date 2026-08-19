@@ -1,8 +1,5 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:background_downloader/background_downloader.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as p;
 import '../models/model_info.dart';
 import 'notification_service.dart';
 
@@ -34,8 +31,9 @@ class DownloadProgress {
 class DownloadService {
   final Map<String, DownloadTask> _activeTasks = {};
   final Map<String, StreamController<DownloadProgress>> _controllers = {};
-  final Map<String, DateTime> _startTime = {};
-  final Map<String, int> _bytesAtLastUpdate = {};
+  final Map<String, DateTime> _lastUpdateTime = {};
+  final Map<String, int> _lastBytes = {};
+  final Map<String, double> _smoothedSpeed = {};
 
   StreamController<DownloadProgress>? getController(String modelId) {
     return _controllers[modelId];
@@ -47,12 +45,6 @@ class DownloadService {
   ) async {
     final controller = StreamController<DownloadProgress>.broadcast();
     _controllers[model.id] = controller;
-
-    final appDir = await getApplicationDocumentsDirectory();
-    final modelsDir = Directory(p.join(appDir.path, 'models'));
-    if (!await modelsDir.exists()) {
-      await modelsDir.create(recursive: true);
-    }
 
     final task = DownloadTask(
       url: model.downloadUrl,
@@ -67,8 +59,9 @@ class DownloadService {
     );
 
     _activeTasks[model.id] = task;
-    _startTime[model.id] = DateTime.now();
-    _bytesAtLastUpdate[model.id] = 0;
+    _lastUpdateTime[model.id] = DateTime.now();
+    _lastBytes[model.id] = 0;
+    _smoothedSpeed[model.id] = 0.0;
 
     try {
       final result = await FileDownloader().download(
@@ -77,17 +70,28 @@ class DownloadService {
           final totalBytes = model.sizeBytes;
           final bytesDownloaded = (progress * totalBytes).toInt();
           final now = DateTime.now();
-          final elapsed = now.difference(_startTime[model.id]!).inMilliseconds;
-          final prevBytes = _bytesAtLastUpdate[model.id] ?? 0;
-          final speed = elapsed > 0
-              ? ((bytesDownloaded - prevBytes) * 1000 / elapsed)
-              : 0.0;
-          _bytesAtLastUpdate[model.id] = bytesDownloaded;
+
+          final lastBytes = _lastBytes[model.id] ?? 0;
+          final deltaBytes = bytesDownloaded > lastBytes
+              ? bytesDownloaded - lastBytes
+              : 0;
+          _lastBytes[model.id] = bytesDownloaded;
+
+          final lastTime = _lastUpdateTime[model.id] ?? now;
+          final deltaMs = now.difference(lastTime).inMilliseconds;
+          if (deltaMs > 0) {
+            final instantSpeed = deltaBytes * 1000.0 / deltaMs;
+            final alpha = 0.3;
+            final prevSmoothed = _smoothedSpeed[model.id] ?? 0.0;
+            _smoothedSpeed[model.id] =
+                alpha * instantSpeed + (1.0 - alpha) * prevSmoothed;
+          }
+          _lastUpdateTime[model.id] = now;
 
           final dlProgress = DownloadProgress(
             bytesDownloaded: bytesDownloaded,
             totalBytes: totalBytes,
-            speedBytesPerSecond: speed,
+            speedBytesPerSecond: _smoothedSpeed[model.id]!,
           );
           onProgress(dlProgress);
           controller.add(dlProgress);
@@ -95,7 +99,7 @@ class DownloadService {
         onStatus: (status) {
           if (status == TaskStatus.paused) {
             final pausedProgress = DownloadProgress(
-              bytesDownloaded: _bytesAtLastUpdate[model.id] ?? 0,
+              bytesDownloaded: _lastBytes[model.id] ?? 0,
               totalBytes: model.sizeBytes,
               speedBytesPerSecond: 0,
               isPaused: true,
@@ -131,18 +135,17 @@ class DownloadService {
         _cleanup(model.id);
         return cancelProgress;
       } else if (result.status == TaskStatus.paused) {
-        final pausedProgress = DownloadProgress(
-          bytesDownloaded: _bytesAtLastUpdate[model.id] ?? 0,
+        // Do NOT cleanup — keep task in _activeTasks so resume can find it.
+        // The controller is also kept alive so resume can re-drive progress.
+        return DownloadProgress(
+          bytesDownloaded: _lastBytes[model.id] ?? 0,
           totalBytes: model.sizeBytes,
           speedBytesPerSecond: 0,
           isPaused: true,
         );
-        onProgress(pausedProgress);
-        controller.add(pausedProgress);
+      } else {
         await controller.close();
         _cleanup(model.id);
-        return pausedProgress;
-      } else {
         throw Exception('Download failed: ${result.status}');
       }
     } catch (e) {
@@ -175,14 +178,16 @@ class DownloadService {
     }
     _activeTasks.clear();
     _controllers.clear();
-    _startTime.clear();
-    _bytesAtLastUpdate.clear();
+    _lastUpdateTime.clear();
+    _lastBytes.clear();
+    _smoothedSpeed.clear();
   }
 
   void _cleanup(String modelId) {
     _activeTasks.remove(modelId);
     _controllers.remove(modelId);
-    _startTime.remove(modelId);
-    _bytesAtLastUpdate.remove(modelId);
+    _lastUpdateTime.remove(modelId);
+    _lastBytes.remove(modelId);
+    _smoothedSpeed.remove(modelId);
   }
 }

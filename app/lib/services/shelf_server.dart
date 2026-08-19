@@ -34,6 +34,25 @@ class ShelfServerService {
         .addHandler(router.call);
 
     _server = await shelf_io.serve(handler, InternetAddress.anyIPv4, port);
+
+    // Health check: confirm the server is actually accepting connections
+    // before returning to the caller, so the URL is only displayed after
+    // the server is proven reachable.
+    await _healthCheck(port);
+  }
+
+  Future<void> _healthCheck(int port) async {
+    try {
+      final socket = await Socket.connect('127.0.0.1', port,
+          timeout: const Duration(seconds: 3));
+      socket.destroy();
+    } catch (e) {
+      // Server claimed to start but is not reachable — tear it down
+      await _server?.close();
+      _server = null;
+      throw StateError(
+          'Server started but is not accepting connections on port $port: $e');
+    }
   }
 
   Future<void> stop() async {
