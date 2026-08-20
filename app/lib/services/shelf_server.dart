@@ -877,7 +877,7 @@ class ShelfServerService {
       } catch (e) {
         btnEl.disabled = false;
         btnEl.textContent = 'Download';
-        showSnackbar('Download failed', 'error');
+        showSnackbar('Download failed: ' + (e.message || e), 'error');
       }
     }
 
