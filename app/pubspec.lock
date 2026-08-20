@@ -465,13 +465,13 @@ packages:
     source: hosted
     version: "2.0.0"
   native_toolchain_cmake:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
       name: native_toolchain_cmake
-      sha256: de90e8952bad0684bdcff4d674c53d961f5cd1fdcf3a0255a669a35986c4ac1d
+      sha256: "44c6c32efee2710cf5aa4b834f215d178ade605fc207fc0ffbf14bd6b32b1645"
       url: "https://pub.dev"
     source: hosted
-    version: "0.2.7"
+    version: "0.3.1"
   network_info_plus:
     dependency: "direct main"
     description:

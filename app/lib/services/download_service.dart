@@ -68,10 +68,16 @@ class DownloadService {
         task,
         onProgress: (progress) {
           final totalBytes = model.sizeBytes;
-          final bytesDownloaded = (progress * totalBytes).toInt();
+          var bytesDownloaded = (progress * totalBytes).toInt();
           final now = DateTime.now();
 
+          // Clamp against known state to handle out-of-order callbacks
           final lastBytes = _lastBytes[model.id] ?? 0;
+          if (bytesDownloaded < lastBytes && progress > 0) {
+            bytesDownloaded = lastBytes;
+          }
+          if (bytesDownloaded < 0) bytesDownloaded = 0;
+          if (bytesDownloaded > totalBytes) bytesDownloaded = totalBytes;
           final deltaBytes = bytesDownloaded > lastBytes
               ? bytesDownloaded - lastBytes
               : 0;

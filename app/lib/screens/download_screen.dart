@@ -7,10 +7,11 @@ import '../models/model_info.dart';
 import '../models/device_info.dart';
 import '../services/device_service.dart';
 import '../services/recommended_models.dart';
-import '../services/download_service.dart';
 import '../services/gguf_validator.dart';
 import '../services/notification_service.dart';
 import '../providers/model_provider.dart';
+import '../services/download_service.dart';
+import '../providers/download_provider.dart';
 import '../widgets/model_card.dart';
 
 class DownloadScreen extends ConsumerStatefulWidget {
@@ -25,7 +26,6 @@ class _DownloadScreenState extends ConsumerState<DownloadScreen>
   late TabController _tabController;
   DeviceHardwareInfo? _deviceInfo;
   List<ModelInfo> _recommendedModels = [];
-  final DownloadService _downloadService = DownloadService();
   String? _downloadingModelId;
   DownloadProgress? _currentProgress;
   bool _notificationPermissionRequested = false;
@@ -63,7 +63,7 @@ class _DownloadScreenState extends ConsumerState<DownloadScreen>
     });
 
     try {
-      final result = await _downloadService.downloadModel(
+      final result = await ref.read(downloadServiceProvider).downloadModel(
         model,
         (progress) {
           setState(() => _currentProgress = progress);
@@ -96,17 +96,17 @@ class _DownloadScreenState extends ConsumerState<DownloadScreen>
 
   void _pauseModelDownload() {
     if (_downloadingModelId != null) {
-      _downloadService.pauseDownload(_downloadingModelId!);
+      ref.read(downloadServiceProvider).pauseDownload(_downloadingModelId!);
     }
   }
 
   void _resumeModelDownload() {
     if (_downloadingModelId == null) return;
-    _downloadService.resumeDownload(_downloadingModelId!);
+    ref.read(downloadServiceProvider).resumeDownload(_downloadingModelId!);
   }
 
   void _cancelModelDownload() {
-    _downloadService.cancelDownload();
+    ref.read(downloadServiceProvider).cancelDownload();
     setState(() {
       _downloadingModelId = null;
       _currentProgress = null;

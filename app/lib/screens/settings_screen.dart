@@ -75,7 +75,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             );
           }
         }
-        await _serverService!.start(8080, wifiIp: wifiIp);
+        await _serverService!.start(0, wifiIp: wifiIp);
         ref.read(settingsProvider.notifier).setWebServerEnabled(true);
         ref.read(settingsProvider.notifier).setWebServerUrl(
               _serverService!.url ?? '',
