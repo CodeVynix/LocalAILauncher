@@ -109,15 +109,14 @@ class DownloadService {
         },
         onStatus: (status) {
           if (status == TaskStatus.paused) {
-            // Use the authoritative progress ratio from background_downloader
-            // to compute the paused byte position. This avoids a race where
-            // onStatus fires before the final onProgress tick has updated
-            // _lastBytes, which would show 0.0 MB to the user.
             final totalBytes = model.sizeBytes;
-            final ratio = _lastProgressRatio[model.id] ?? 0.0;
-            final pausedBytes = (ratio * totalBytes).toInt();
+            final rawRatio = _lastProgressRatio[model.id] ?? 0.0;
+            final clampedRatio = rawRatio.clamp(0.0, 1.0);
+            final pausedBytes = (clampedRatio * totalBytes).toInt();
+            final safeBytes = pausedBytes.clamp(0, totalBytes);
+            print('[DownloadService] paused (onStatus): rawRatio=$rawRatio, clampedRatio=$clampedRatio, pausedBytes=$pausedBytes, safeBytes=$safeBytes, totalBytes=$totalBytes');
             final pausedProgress = DownloadProgress(
-              bytesDownloaded: pausedBytes,
+              bytesDownloaded: safeBytes,
               totalBytes: totalBytes,
               speedBytesPerSecond: 0,
               isPaused: true,
@@ -156,11 +155,13 @@ class DownloadService {
         return cancelProgress;
       } else if (result.status == TaskStatus.paused) {
         // Do NOT cleanup — keep task in _activeTasks so resume can find it.
-        // Use the authoritative progress ratio for the paused byte position.
-        final ratio = _lastProgressRatio[model.id] ?? 0.0;
-        final pausedBytes = (ratio * totalBytes).toInt();
+        final rawRatio = _lastProgressRatio[model.id] ?? 0.0;
+        final clampedRatio = rawRatio.clamp(0.0, 1.0);
+        final pausedBytes = (clampedRatio * totalBytes).toInt();
+        final safeBytes = pausedBytes.clamp(0, totalBytes);
+        print('[DownloadService] paused (result): rawRatio=$rawRatio, clampedRatio=$clampedRatio, pausedBytes=$pausedBytes, safeBytes=$safeBytes, totalBytes=$totalBytes');
         return DownloadProgress(
-          bytesDownloaded: pausedBytes,
+          bytesDownloaded: safeBytes,
           totalBytes: totalBytes,
           speedBytesPerSecond: 0,
           isPaused: true,

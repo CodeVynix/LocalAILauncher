@@ -376,34 +376,58 @@ class ShelfServerService {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Local AI Launcher</title>
   <style>
+    :root {
+      --md-primary: #D0BCFF;
+      --md-on-primary: #381E72;
+      --md-primary-container: #4F378B;
+      --md-on-primary-container: #EADDFF;
+      --md-secondary: #CCC2DC;
+      --md-on-secondary: #332D41;
+      --md-secondary-container: #4A4458;
+      --md-on-secondary-container: #E8DEF8;
+      --md-tertiary: #EFB8C8;
+      --md-surface: #141218;
+      --md-on-surface: #E6E0E9;
+      --md-on-surface-variant: #CAC4D0;
+      --md-surface-container-lowest: #0F0D13;
+      --md-surface-container-low: #1D1B20;
+      --md-surface-container: #211F26;
+      --md-surface-container-high: #2B2930;
+      --md-surface-container-highest: #36343B;
+      --md-outline: #938F99;
+      --md-outline-variant: #49454F;
+      --md-error: #F2B8B5;
+      --md-error-container: #8C1D18;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #1a1a2e;
-      color: #e0e0e0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--md-surface);
+      color: var(--md-on-surface);
       min-height: 100vh;
     }
+
+    /* ── Tabs ── */
     .tabs {
       display: flex;
-      background: #16213e;
-      border-bottom: 2px solid #0f3460;
+      background: var(--md-surface-container);
+      border-bottom: 1px solid var(--md-outline-variant);
     }
     .tab {
       flex: 1;
       padding: 14px 12px;
       text-align: center;
       cursor: pointer;
-      transition: background 0.2s, border-color 0.2s;
+      transition: background 0.2s, color 0.2s;
       font-size: 14px;
       font-weight: 500;
-      color: #8892a4;
+      color: var(--md-on-surface-variant);
       border-bottom: 2px solid transparent;
     }
-    .tab:hover { background: #0f3460; color: #ccc; }
+    .tab:hover { background: var(--md-surface-container-high); color: var(--md-on-surface); }
     .tab.active {
-      background: #0f3460;
-      color: #e94560;
-      border-bottom-color: #e94560;
+      color: var(--md-primary);
+      border-bottom-color: var(--md-primary);
     }
     .tab-content { display: none; padding: 0; }
     .tab-content.active { display: block; }
@@ -411,125 +435,207 @@ class ShelfServerService {
     /* ── Chat ── */
     .chat-container { display: flex; flex-direction: column; height: calc(100vh - 52px); }
     .messages { flex: 1; overflow-y: auto; padding: 16px; }
-    .message { margin: 8px 0; padding: 12px 16px; border-radius: 16px; max-width: 80%; line-height: 1.5; }
-    .message.user { background: #0f3460; margin-left: auto; border-bottom-right-radius: 4px; }
-    .message.assistant { background: #16213e; margin-right: auto; border-bottom-left-radius: 4px; border: 1px solid #0f3460; }
-    .input-bar { display: flex; gap: 8px; padding: 12px 16px; background: #16213e; border-top: 1px solid #0f3460; }
+    .message {
+      margin: 4px 0; padding: 10px 16px; border-radius: 16px;
+      max-width: 75%; line-height: 1.5; font-size: 14px;
+      word-wrap: break-word;
+    }
+    .message.user {
+      background: var(--md-primary); color: var(--md-on-primary);
+      margin-left: auto; border-bottom-right-radius: 4px;
+    }
+    .message.assistant {
+      background: var(--md-surface-container-highest); color: var(--md-on-surface);
+      margin-right: auto; border-bottom-left-radius: 4px;
+    }
+    .empty-chat {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      color: var(--md-on-surface-variant); font-size: 15px;
+    }
+    .input-bar {
+      display: flex; gap: 8px; padding: 12px 16px;
+      background: var(--md-surface-container);
+      border-top: 1px solid var(--md-outline-variant);
+    }
     .input-bar input {
       flex: 1; padding: 12px 16px;
-      border: 1px solid #0f3460; border-radius: 24px;
-      background: #1a1a2e; color: #e0e0e0; font-size: 14px;
+      border: 1px solid var(--md-outline); border-radius: 28px;
+      background: var(--md-surface-container-low); color: var(--md-on-surface);
+      font-size: 14px; outline: none; transition: border-color 0.2s;
     }
-    .input-bar input:focus { outline: none; border-color: #e94560; }
-    .input-bar button {
-      padding: 12px 24px; background: #e94560; color: white;
-      border: none; border-radius: 24px; cursor: pointer; font-weight: 600;
+    .input-bar input:focus { border-color: var(--md-primary); }
+    .input-bar input::placeholder { color: var(--md-on-surface-variant); }
+    .send-btn {
+      width: 48px; height: 48px; border-radius: 24px; border: none;
+      background: var(--md-primary); color: var(--md-on-primary);
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
       transition: background 0.2s;
     }
-    .input-bar button:hover { background: #d63851; }
+    .send-btn:hover { background: #B69DF8; }
+    .send-btn svg { width: 22px; height: 22px; fill: currentColor; }
 
-    /* ── Download ── */
+    /* ── Error state (no model) ── */
+    .error-state {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 24px; text-align: center;
+    }
+    .error-state .error-icon {
+      width: 64px; height: 64px; border-radius: 50%;
+      background: var(--md-error-container); color: var(--md-error);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 16px; font-size: 32px;
+    }
+    .error-state .error-msg {
+      font-size: 18px; color: var(--md-on-surface); margin-bottom: 24px;
+      line-height: 1.4;
+    }
+    .error-state .error-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 24px; border-radius: 20px; border: none;
+      background: var(--md-primary); color: var(--md-on-primary);
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: background 0.2s;
+    }
+    .error-state .error-btn:hover { background: #B69DF8; }
+    .error-state .error-btn svg { width: 18px; height: 18px; fill: currentColor; }
+
+    /* ── Download Tab ── */
     .dl-section { padding: 0; }
-    .dl-tabs { display: flex; background: #16213e; border-bottom: 1px solid #0f3460; }
+    .dl-tabs {
+      display: flex; background: var(--md-surface-container);
+      border-bottom: 1px solid var(--md-outline-variant);
+    }
     .dl-tab {
       flex: 1; padding: 12px; text-align: center; cursor: pointer;
-      font-size: 13px; font-weight: 500; color: #8892a4;
+      font-size: 13px; font-weight: 500; color: var(--md-on-surface-variant);
       border-bottom: 2px solid transparent; transition: all 0.2s;
     }
-    .dl-tab:hover { color: #ccc; }
-    .dl-tab.active { color: #e94560; border-bottom-color: #e94560; }
+    .dl-tab:hover { color: var(--md-on-surface); }
+    .dl-tab.active { color: var(--md-primary); border-bottom-color: var(--md-primary); }
     .dl-tab-content { display: none; padding: 12px; }
     .dl-tab-content.active { display: block; }
 
     .device-bar {
       display: flex; align-items: center; gap: 10px;
-      padding: 12px 16px; background: #16213e; border-bottom: 1px solid #0f3460;
-      font-size: 13px; font-weight: 600;
+      padding: 12px 16px; background: var(--md-surface-container);
+      border-bottom: 1px solid var(--md-outline-variant);
+      font-size: 13px; font-weight: 600; color: var(--md-on-surface);
     }
+    .device-bar .icon { color: var(--md-on-surface-variant); }
     .model-card {
-      background: #16213e; padding: 16px; margin: 8px 12px;
-      border-radius: 12px; border: 1px solid #0f3460;
+      background: var(--md-surface-container); padding: 16px; margin: 8px 12px;
+      border-radius: 12px; border: 1px solid var(--md-outline-variant);
       transition: border-color 0.2s;
     }
-    .model-card:hover { border-color: #e94560; }
-    .model-card h3 { font-size: 15px; margin-bottom: 6px; color: #fff; }
-    .model-card .desc { font-size: 13px; color: #8892a4; margin-bottom: 8px; }
+    .model-card:hover { border-color: var(--md-primary); }
+    .model-card h3 { font-size: 15px; margin-bottom: 6px; color: var(--md-on-surface); }
+    .model-card .desc { font-size: 13px; color: var(--md-on-surface-variant); margin-bottom: 8px; }
     .model-card .chips { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
-    .model-card .meta { font-size: 12px; color: #667; margin-bottom: 10px; }
+    .model-card .meta { font-size: 12px; color: var(--md-on-surface-variant); margin-bottom: 10px; opacity: 0.7; }
     .chip {
       padding: 3px 10px; border-radius: 12px;
       font-size: 11px; font-weight: 600; color: #fff;
     }
-    .chip-aggressive { background: #e67e22; }
-    .chip-non-aggressive { background: #2980b9; }
-    .chip-uncensored { background: #c0392b; }
-    .chip-censored { background: #27ae60; }
+    .chip-aggressive { background: #EF6C00; }
+    .chip-nonaggressive { background: #1565C0; }
+    .chip-uncensored { background: #C62828; }
+    .chip-censored { background: #2E7D32; }
     .chip-tier {
       padding: 2px 8px; border-radius: 10px;
       font-size: 11px; font-weight: 700; color: #fff;
     }
-    .tier-limited { background: #e67e22; }
-    .tier-good { background: #2980b9; }
-    .tier-excellent { background: #27ae60; }
+    .tier-limited { background: #EF6C00; }
+    .tier-good { background: #1565C0; }
+    .tier-excellent { background: #2E7D32; }
 
     .btn {
-      padding: 8px 20px; border: none; border-radius: 8px;
+      padding: 10px 20px; border: none; border-radius: 20px;
       cursor: pointer; font-weight: 600; font-size: 13px;
       transition: background 0.2s; width: 100%;
     }
-    .btn-download { background: #e94560; color: #fff; }
-    .btn-download:hover { background: #d63851; }
-    .btn-download:disabled { background: #555; color: #888; cursor: default; }
-    .btn-downloaded { background: #27ae60; color: #fff; cursor: default; }
-    .btn-cancel { background: transparent; color: #e94560; border: 1px solid #e94560; margin-top: 6px; }
+    .btn-download { background: var(--md-primary); color: var(--md-on-primary); }
+    .btn-download:hover { background: #B69DF8; }
+    .btn-download:disabled { background: var(--md-surface-container-high); color: var(--md-on-surface-variant); cursor: default; }
+    .btn-downloaded { background: #2E7D32; color: #fff; cursor: default; }
 
-    .progress-bar { height: 6px; background: #0f3460; border-radius: 3px; overflow: hidden; margin: 8px 0; }
-    .progress-fill { height: 100%; background: #e94560; transition: width 0.3s; }
-    .progress-info { display: flex; justify-content: space-between; font-size: 12px; color: #8892a4; }
+    .progress-bar {
+      height: 6px; background: var(--md-surface-container-lowest);
+      border-radius: 3px; overflow: hidden; margin: 8px 0;
+    }
+    .progress-fill { height: 100%; background: var(--md-primary); transition: width 0.3s; }
+    .progress-info {
+      display: flex; justify-content: space-between;
+      font-size: 12px; color: var(--md-on-surface-variant);
+    }
 
     /* ── Settings ── */
     .settings { padding: 16px; }
     .hw-section { margin-bottom: 20px; }
-    .hw-section h3 { font-size: 17px; font-weight: 700; margin-bottom: 12px; color: #fff; }
-    .hw-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 14px; }
-    .hw-icon { width: 20px; text-align: center; color: #8892a4; }
-    .temp-slider { width: 100%; margin: 8px 0; accent-color: #e94560; }
-    .temp-labels { display: flex; justify-content: space-between; font-size: 12px; color: #667; }
-    .server-toggle { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; }
+    .hw-section h3 {
+      font-size: 17px; font-weight: 700; margin-bottom: 12px;
+      color: var(--md-on-surface);
+    }
+    .hw-row {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 10px; font-size: 14px; color: var(--md-on-surface);
+    }
+    .hw-icon { width: 20px; text-align: center; color: var(--md-on-surface-variant); }
+    .temp-slider { width: 100%; margin: 8px 0; accent-color: var(--md-primary); }
+    .temp-labels {
+      display: flex; justify-content: space-between;
+      font-size: 12px; color: var(--md-on-surface-variant); opacity: 0.7;
+    }
+    .server-toggle {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 0; color: var(--md-on-surface);
+    }
     .toggle-switch {
-      width: 48px; height: 26px; border-radius: 13px;
-      background: #555; position: relative; cursor: pointer; transition: background 0.3s;
+      width: 52px; height: 32px; border-radius: 16px;
+      background: var(--md-surface-container-highest);
+      border: 2px solid var(--md-outline); position: relative;
+      cursor: pointer; transition: background 0.3s, border-color 0.3s;
     }
-    .toggle-switch.on { background: #e94560; }
+    .toggle-switch.on { background: var(--md-primary); border-color: var(--md-primary); }
     .toggle-switch::after {
-      content: ''; position: absolute; width: 22px; height: 22px;
-      border-radius: 50%; background: #fff; top: 2px; left: 2px; transition: transform 0.3s;
+      content: ''; position: absolute; width: 24px; height: 24px;
+      border-radius: 50%; background: var(--md-outline); top: 2px; left: 2px;
+      transition: transform 0.3s, background 0.3s;
     }
-    .toggle-switch.on::after { transform: translateX(22px); }
+    .toggle-switch.on::after {
+      transform: translateX(20px); background: var(--md-on-primary);
+    }
     .url-box {
-      margin-top: 10px; padding: 12px; border-radius: 8px;
-      background: #0f3460; font-family: monospace; font-weight: 700; font-size: 14px;
+      margin-top: 10px; padding: 12px; border-radius: 12px;
+      background: var(--md-surface-container-low);
+      border: 1px solid var(--md-outline-variant);
+      font-family: monospace; font-weight: 700; font-size: 14px;
+      color: var(--md-primary);
     }
 
     /* ── Import ── */
     .import-zone {
-      border: 2px dashed #0f3460; border-radius: 12px;
+      border: 2px dashed var(--md-outline-variant); border-radius: 12px;
       padding: 40px 20px; text-align: center; margin: 12px;
       cursor: pointer; transition: border-color 0.2s;
     }
-    .import-zone:hover { border-color: #e94560; }
+    .import-zone:hover { border-color: var(--md-primary); }
     .import-zone input { display: none; }
-    .import-zone .icon { font-size: 48px; color: #667; margin-bottom: 12px; }
-    .import-zone .label { font-size: 15px; margin-bottom: 8px; }
-    .import-zone .sublabel { font-size: 13px; color: #667; }
+    .import-zone .icon { font-size: 48px; color: var(--md-on-surface-variant); margin-bottom: 12px; }
+    .import-zone .label { font-size: 15px; margin-bottom: 8px; color: var(--md-on-surface); }
+    .import-zone .sublabel { font-size: 13px; color: var(--md-on-surface-variant); }
+
     .snackbar {
       position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-      padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600;
+      padding: 12px 24px; border-radius: 12px; font-size: 14px; font-weight: 600;
       color: #fff; z-index: 100; animation: fadeIn 0.3s;
     }
-    .snackbar-success { background: #27ae60; }
-    .snackbar-error { background: #c0392b; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+    .snackbar-success { background: #2E7D32; }
+    .snackbar-error { background: #C62828; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
   </style>
 </head>
 <body>
@@ -542,10 +648,23 @@ class ShelfServerService {
   <!-- ── Chat Tab ── -->
   <div id="chat-tab" class="tab-content active">
     <div class="chat-container">
-      <div class="messages" id="messages"></div>
-      <div class="input-bar">
+      <div id="chatErrorState" class="error-state" style="display:none">
+        <div class="error-icon">&#9888;</div>
+        <div class="error-msg">Error: No local model detected, download one.</div>
+        <button class="error-btn" onclick="switchTab('download')">
+          <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+          Go to Download
+        </button>
+      </div>
+      <div id="chatMessagesWrap">
+        <div class="empty-chat" id="emptyChat">Start a conversation</div>
+        <div class="messages" id="messages"></div>
+      </div>
+      <div class="input-bar" id="chatInputBar">
         <input type="text" id="chatInput" placeholder="Type a message..." onkeypress="if(event.key==='Enter')sendMessage()">
-        <button onclick="sendMessage()">Send</button>
+        <button class="send-btn" onclick="sendMessage()" aria-label="Send">
+          <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
       </div>
     </div>
   </div>
@@ -554,7 +673,7 @@ class ShelfServerService {
   <div id="download-tab" class="tab-content">
     <div class="dl-section">
       <div class="device-bar" id="deviceBar">
-        <span>&#9432;</span>
+        <span class="icon">&#9432;</span>
         <span id="deviceInfo">Loading device info...</span>
       </div>
       <div class="dl-tabs">
@@ -590,12 +709,12 @@ class ShelfServerService {
       </div>
       <div class="hw-section">
         <h3>Temperature</h3>
-        <div id="tempValue" style="font-size:14px;color:#8892a4;margin-bottom:4px">Current: 0.7</div>
+        <div id="tempValue" style="font-size:14px;color:var(--md-on-surface-variant);margin-bottom:4px">Current: 0.7</div>
         <input type="range" class="temp-slider" min="0" max="1.5" step="0.1" value="0.7"
           oninput="document.getElementById('tempValue').textContent='Current: '+parseFloat(this.value).toFixed(1)">
         <div class="temp-labels">
-          <span>0.0 - Safe/Deterministic</span>
-          <span>1.5 - Random/Creative</span>
+          <span>0.0 — Safe / Deterministic</span>
+          <span>1.5 — Random / Creative</span>
         </div>
       </div>
       <div class="hw-section">
@@ -610,40 +729,44 @@ class ShelfServerService {
   </div>
 
   <script>
-    // ── Tab switching ──
+    /* ── Model availability state ── */
+    var _hasDownloadedModel = false;
+
+    /* ── Tab switching ── */
     function switchTab(name) {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-      var idx = name==='chat' ? 0 : (name==='download' ? 1 : 2);
+      document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+      document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
+      var idx = name === 'chat' ? 0 : (name === 'download' ? 1 : 2);
       document.querySelectorAll('.tab')[idx].classList.add('active');
-      document.getElementById(name+'-tab').classList.add('active');
-      if(name==='download') { loadDeviceInfo(); loadRecommendedModels(); }
-      if(name==='settings') loadDeviceInfo();
+      document.getElementById(name + '-tab').classList.add('active');
+      if (name === 'download') { loadDeviceInfo(); loadRecommendedModels(); }
+      if (name === 'settings') loadDeviceInfo();
+      if (name === 'chat') refreshChatState();
     }
 
     function switchDlTab(name) {
-      document.querySelectorAll('.dl-tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.dl-tab-content').forEach(t => t.classList.remove('active'));
-      var idx = name==='recommended' ? 0 : 1;
+      document.querySelectorAll('.dl-tab').forEach(function(t) { t.classList.remove('active'); });
+      document.querySelectorAll('.dl-tab-content').forEach(function(t) { t.classList.remove('active'); });
+      var idx = name === 'recommended' ? 0 : 1;
       document.querySelectorAll('.dl-tab')[idx].classList.add('active');
-      document.getElementById(name+'-tab').classList.add('active');
+      document.getElementById(name + '-tab').classList.add('active');
     }
 
-    // ── Snackbar ──
+    /* ── Snackbar ── */
     function showSnackbar(msg, type) {
       var el = document.createElement('div');
       el.className = 'snackbar snackbar-' + type;
       el.textContent = msg;
       document.body.appendChild(el);
-      setTimeout(() => el.remove(), 3000);
+      setTimeout(function() { el.remove(); }, 3000);
     }
 
-    // ── Device Info ──
+    /* ── Device Info ── */
     async function loadDeviceInfo() {
       try {
         var res = await fetch('/api/device-info');
         var info = await res.json();
-        if(info.error) return;
+        if (info.error) return;
         document.getElementById('hwCpu').textContent = info.cpuModel || 'Unknown CPU';
         document.getElementById('hwRam').textContent = 'RAM: ' + info.roundedRamGb + 'GB';
         var tierEl = document.getElementById('hwTier');
@@ -651,27 +774,62 @@ class ShelfServerService {
         document.getElementById('hwStorage').textContent = 'Platform: ' + info.platform + ' ' + info.osVersion;
         document.getElementById('deviceInfo').textContent =
           'Device: ' + info.roundedRamGb + 'GB RAM (' + info.hardwareTier + '), ' + info.cpuCores + ' CPU cores';
-      } catch(e) { console.error('Failed to load device info', e); }
+      } catch (e) { console.error('Failed to load device info', e); }
     }
 
-    // ── Recommended Models ──
+    /* ── Chat state / model check ── */
+    async function refreshChatState() {
+      try {
+        var res = await fetch('/api/models');
+        var models = await res.json();
+        _hasDownloadedModel = models.some(function(m) { return m.isDownloaded; });
+        updateChatUI();
+      } catch (e) {
+        console.error('Failed to check models', e);
+        _hasDownloadedModel = false;
+        updateChatUI();
+      }
+    }
+
+    function updateChatUI() {
+      var errEl = document.getElementById('chatErrorState');
+      var msgWrap = document.getElementById('chatMessagesWrap');
+      var inputBar = document.getElementById('chatInputBar');
+      if (_hasDownloadedModel) {
+        errEl.style.display = 'none';
+        msgWrap.style.display = '';
+        inputBar.style.display = '';
+      } else {
+        errEl.style.display = '';
+        msgWrap.style.display = 'none';
+        inputBar.style.display = 'none';
+      }
+    }
+
+    /* ── Recommended Models ── */
     var activePolls = {};
     async function loadRecommendedModels() {
       try {
         var res = await fetch('/api/recommended-models');
         var models = await res.json();
         var el = document.getElementById('modelList');
-        if(!models.length) { el.innerHTML='<p style="color:#667;padding:16px">No recommended models for your device.</p>'; return; }
-        el.innerHTML = models.map(m => renderModelCard(m)).join('');
-      } catch(e) { console.error('Failed to load models', e); }
+        if (!models.length) {
+          el.innerHTML = '<p style="color:var(--md-on-surface-variant);padding:16px">No recommended models for your device.</p>';
+          return;
+        }
+        el.innerHTML = models.map(function(m) { return renderModelCard(m); }).join('');
+      } catch (e) { console.error('Failed to load models', e); }
     }
 
     function renderModelCard(m) {
-      var chips = '<span class="chip chip-' + m.aggressiveness + '">' +
-        (m.aggressiveness==='aggressive'?'Aggressive':'Non-aggressive') + '</span>' +
+      var chips =
+        '<span class="chip chip-' + m.aggressiveness + '">' +
+          (m.aggressiveness === 'aggressive' ? 'Aggressive' : 'Non-aggressive') +
+        '</span>' +
         '<span class="chip chip-' + m.censorship + '">' +
-        (m.censorship==='uncensored'?'Uncensored':'Censored') + '</span>';
-      var meta = m.paramCount + ' | ' + m.size + ' | ' + m.quantization;
+          (m.censorship === 'uncensored' ? 'Uncensored' : 'Censored') +
+        '</span>';
+      var meta = m.paramCount + ' params \u00B7 ' + m.size + ' \u00B7 ' + m.quantization;
       var btn = m.isDownloaded
         ? '<button class="btn btn-downloaded" disabled>Downloaded</button>'
         : '<button class="btn btn-download" onclick="startDownload(\'' + m.id + '\', this)">Download</button>';
@@ -681,39 +839,42 @@ class ShelfServerService {
         '<div class="desc">' + m.description + '</div>' +
         '<div class="meta">' + meta + '</div>' +
         '<div id="progress-' + m.id + '"></div>' +
-        btn + '</div>';
+        btn +
+        '</div>';
     }
 
-    // ── Download ──
+    /* ── Download ── */
     async function startDownload(modelId, btnEl) {
       btnEl.disabled = true;
       btnEl.textContent = 'Starting...';
       try {
         var res = await fetch('/api/download-model', {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({modelId: modelId})
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ modelId: modelId })
         });
         var data = await res.json();
-        if(data.status === 'already_downloaded') {
+        if (data.status === 'already_downloaded') {
           btnEl.textContent = 'Downloaded';
           btnEl.className = 'btn btn-downloaded';
           return;
         }
-        if(data.error) {
+        if (data.error) {
           btnEl.disabled = false;
           btnEl.textContent = 'Download';
           showSnackbar(data.error, 'error');
           return;
         }
-        // Show progress bar and start polling
         var progEl = document.getElementById('progress-' + modelId);
-        progEl.innerHTML = '<div class="progress-bar"><div class="progress-fill" id="fill-' + modelId + '" style="width:0%"></div></div>' +
-          '<div class="progress-info"><span id="prog-text-' + modelId + '">0.0 MB / 0.00 GB</span>' +
-          '<span id="prog-speed-' + modelId + '">0.0 MB/s</span></div>';
+        progEl.innerHTML =
+          '<div class="progress-bar"><div class="progress-fill" id="fill-' + modelId + '" style="width:0%"></div></div>' +
+          '<div class="progress-info">' +
+            '<span id="prog-text-' + modelId + '">0.0 MB / 0.00 GB</span>' +
+            '<span id="prog-speed-' + modelId + '">0.0 MB/s</span>' +
+          '</div>';
         btnEl.textContent = 'Downloading...';
         pollProgress(modelId, btnEl);
-      } catch(e) {
+      } catch (e) {
         btnEl.disabled = false;
         btnEl.textContent = 'Download';
         showSnackbar('Download failed', 'error');
@@ -721,66 +882,79 @@ class ShelfServerService {
     }
 
     function pollProgress(modelId, btnEl) {
-      if(activePolls[modelId]) return;
-      activePolls[modelId] = setInterval(async () => {
+      if (activePolls[modelId]) return;
+      activePolls[modelId] = setInterval(async function() {
         try {
           var res = await fetch('/api/download-progress/' + modelId);
           var p = await res.json();
-          if(p.status === 'not_found') { stopPoll(modelId); return; }
+          if (p.status === 'not_found') { stopPoll(modelId); return; }
           var fill = document.getElementById('fill-' + modelId);
           var txt = document.getElementById('prog-text-' + modelId);
           var spd = document.getElementById('prog-speed-' + modelId);
-          if(fill) fill.style.width = (p.progress * 100).toFixed(1) + '%';
-          if(txt) txt.textContent = p.display;
-          if(spd) spd.textContent = p.speedDisplay;
-          if(p.isCancelled) { stopPoll(modelId); btnEl.textContent = 'Download'; btnEl.disabled = false; }
-          if(!p.isPaused && p.progress >= 1.0) {
+          if (fill) fill.style.width = (p.progress * 100).toFixed(1) + '%';
+          if (txt) txt.textContent = p.display;
+          if (spd) spd.textContent = p.speedDisplay;
+          if (p.isCancelled) {
+            stopPoll(modelId);
+            btnEl.textContent = 'Download';
+            btnEl.disabled = false;
+          }
+          if (!p.isPaused && p.progress >= 1.0) {
             stopPoll(modelId);
             btnEl.textContent = 'Downloaded';
             btnEl.className = 'btn btn-downloaded';
             var progEl = document.getElementById('progress-' + modelId);
-            if(progEl) progEl.innerHTML = '';
-            showSnackbar(modelId.replace(/-/g,' ') + ' is ready to use', 'success');
+            if (progEl) progEl.innerHTML = '';
+            showSnackbar(modelId.replace(/-/g, ' ') + ' is ready to use', 'success');
           }
-        } catch(e) { stopPoll(modelId); }
+        } catch (e) { stopPoll(modelId); }
       }, 500);
     }
 
     function stopPoll(modelId) {
-      if(activePolls[modelId]) { clearInterval(activePolls[modelId]); delete activePolls[modelId]; }
+      if (activePolls[modelId]) {
+        clearInterval(activePolls[modelId]);
+        delete activePolls[modelId];
+      }
     }
 
-    // ── GGUF Import ──
+    /* ── GGUF Import ── */
     async function uploadGguf(input) {
       var file = input.files[0];
-      if(!file) return;
+      if (!file) return;
       var formData = new FormData();
       formData.append('file', file);
       try {
         showSnackbar('Validating and importing ' + file.name + '...', 'success');
-        var res = await fetch('/api/import-gguf', {method: 'POST', body: formData});
+        var res = await fetch('/api/import-gguf', { method: 'POST', body: formData });
         var data = await res.json();
-        if(data.status === 'imported') {
+        if (data.status === 'imported') {
           showSnackbar('Model imported successfully', 'success');
           loadRecommendedModels();
         } else {
           showSnackbar(data.error || 'Import failed', 'error');
         }
-      } catch(e) {
+      } catch (e) {
         showSnackbar('Import failed: ' + e.message, 'error');
       }
       input.value = '';
     }
 
-    // ── Chat ──
+    /* ── Chat ── */
     async function sendMessage() {
       var input = document.getElementById('chatInput');
       var msg = input.value.trim();
-      if(!msg) return;
+      if (!msg) return;
       appendMessage('user', msg);
       input.value = '';
-      appendMessage('assistant', 'Thinking...');
-      await fetch('/api/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:msg})});
+      var thinking = appendMessage('assistant', 'Thinking...');
+      try {
+        await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: msg })
+        });
+      } catch (e) { /* server handles it */ }
       setTimeout(loadHistory, 500);
     }
 
@@ -788,8 +962,10 @@ class ShelfServerService {
       var div = document.createElement('div');
       div.className = 'message ' + role;
       div.textContent = content;
-      document.getElementById('messages').appendChild(div);
-      div.scrollIntoView({behavior:'smooth'});
+      var container = document.getElementById('messages');
+      container.appendChild(div);
+      div.scrollIntoView({ behavior: 'smooth' });
+      return div;
     }
 
     async function loadHistory() {
@@ -798,11 +974,17 @@ class ShelfServerService {
         var history = await res.json();
         var el = document.getElementById('messages');
         el.innerHTML = '';
-        history.forEach(m => appendMessage(m.role, m.content));
-      } catch(e) { console.error('Failed to load history', e); }
+        if (history.length === 0) {
+          document.getElementById('emptyChat').style.display = '';
+        } else {
+          document.getElementById('emptyChat').style.display = 'none';
+          history.forEach(function(m) { appendMessage(m.role, m.content); });
+        }
+      } catch (e) { console.error('Failed to load history', e); }
     }
 
-    // ── Init ──
+    /* ── Init ── */
+    refreshChatState();
     loadHistory();
   </script>
 </body>
