@@ -1,10 +1,15 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:network_info_plus/network_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import '../models/model_info.dart';
 import '../providers/settings_provider.dart';
 import '../providers/model_provider.dart';
 import '../services/shelf_server.dart';
 import '../services/device_service.dart';
+import '../services/recommended_models.dart';
+import '../services/gguf_validator.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -29,6 +34,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       getModels: () => ref.read(modelListProvider),
       getChatHistory: () => [],
       onSendMessage: (msg) async {},
+      getDeviceInfo: () => DeviceService.getDeviceInfo(),
+      getRecommendedModels: (ramGb) =>
+          RecommendedModels.getRecommendedForDevice(ramGb),
+      onImportGguf: (path, fileName) async {
+        final validation = await GgufValidator.validateFile(path);
+        if (!validation.isValid) return false;
+
+        final modelsDir = await _getModelsDirectory();
+        final localPath = '${modelsDir.path}/$fileName';
+        final srcFile = File(path);
+        await srcFile.copy(localPath);
+
+        final model = ModelInfo(
+          id: fileName,
+          name: fileName.replaceAll('.gguf', ''),
+          description: 'Custom imported model',
+          fileName: fileName,
+          downloadUrl: '',
+          sizeBytes: srcFile.lengthSync(),
+          paramCount: 0,
+          quantization: 'unknown',
+          aggressiveness: ModelAggressiveness.nonAggressive,
+          censorship: ModelCensorship.censored,
+          minRamGb: 0,
+        );
+        await ref
+            .read(modelListProvider.notifier)
+            .addModel(model, localPath);
+        return true;
+      },
     );
     _loadHardwareInfo();
   }
@@ -68,7 +103,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text(
-                  'WiFi not connected. The server will be accessible at 0.0.0.0:8080 only on this device.',
+                  'WiFi not connected. The server will be accessible at 0.0.0.0 only on this device.',
                 ),
                 backgroundColor: Colors.orange,
               ),
@@ -391,6 +426,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  Future<Directory> _getModelsDirectory() async {
+    final appDir = await getApplicationDocumentsDirectory();
+    final modelsDir = Directory('${appDir.path}/models');
+    if (!await modelsDir.exists()) {
+      await modelsDir.create(recursive: true);
+    }
+    return modelsDir;
   }
 
   @override

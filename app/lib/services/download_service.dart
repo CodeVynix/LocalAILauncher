@@ -34,6 +34,7 @@ class DownloadService {
   final Map<String, DateTime> _lastUpdateTime = {};
   final Map<String, int> _lastBytes = {};
   final Map<String, double> _smoothedSpeed = {};
+  final Map<String, double> _lastProgressRatio = {};
 
   StreamController<DownloadProgress>? getController(String modelId) {
     return _controllers[modelId];
@@ -62,6 +63,7 @@ class DownloadService {
     _lastUpdateTime[model.id] = DateTime.now();
     _lastBytes[model.id] = 0;
     _smoothedSpeed[model.id] = 0.0;
+    _lastProgressRatio[model.id] = 0.0;
 
     try {
       final result = await FileDownloader().download(
@@ -78,15 +80,18 @@ class DownloadService {
           }
           if (bytesDownloaded < 0) bytesDownloaded = 0;
           if (bytesDownloaded > totalBytes) bytesDownloaded = totalBytes;
-          final deltaBytes = bytesDownloaded > lastBytes
-              ? bytesDownloaded - lastBytes
-              : 0;
           _lastBytes[model.id] = bytesDownloaded;
+
+          // Store the authoritative progress ratio from the package.
+          // This is always fresh from background_downloader's own state
+          // and is used as the source of truth at pause time.
+          _lastProgressRatio[model.id] = progress;
 
           final lastTime = _lastUpdateTime[model.id] ?? now;
           final deltaMs = now.difference(lastTime).inMilliseconds;
           if (deltaMs > 0) {
-            final instantSpeed = deltaBytes * 1000.0 / deltaMs;
+            final instantSpeed =
+                (bytesDownloaded - lastBytes) * 1000.0 / deltaMs;
             final alpha = 0.3;
             final prevSmoothed = _smoothedSpeed[model.id] ?? 0.0;
             _smoothedSpeed[model.id] =
@@ -104,9 +109,16 @@ class DownloadService {
         },
         onStatus: (status) {
           if (status == TaskStatus.paused) {
+            // Use the authoritative progress ratio from background_downloader
+            // to compute the paused byte position. This avoids a race where
+            // onStatus fires before the final onProgress tick has updated
+            // _lastBytes, which would show 0.0 MB to the user.
+            final totalBytes = model.sizeBytes;
+            final ratio = _lastProgressRatio[model.id] ?? 0.0;
+            final pausedBytes = (ratio * totalBytes).toInt();
             final pausedProgress = DownloadProgress(
-              bytesDownloaded: _lastBytes[model.id] ?? 0,
-              totalBytes: model.sizeBytes,
+              bytesDownloaded: pausedBytes,
+              totalBytes: totalBytes,
               speedBytesPerSecond: 0,
               isPaused: true,
             );
@@ -116,10 +128,12 @@ class DownloadService {
         },
       );
 
+      final totalBytes = model.sizeBytes;
+
       if (result.status == TaskStatus.complete) {
         final finalProgress = DownloadProgress(
-          bytesDownloaded: model.sizeBytes,
-          totalBytes: model.sizeBytes,
+          bytesDownloaded: totalBytes,
+          totalBytes: totalBytes,
           speedBytesPerSecond: 0,
         );
         onProgress(finalProgress);
@@ -131,7 +145,7 @@ class DownloadService {
       } else if (result.status == TaskStatus.canceled) {
         final cancelProgress = DownloadProgress(
           bytesDownloaded: 0,
-          totalBytes: model.sizeBytes,
+          totalBytes: totalBytes,
           speedBytesPerSecond: 0,
           isCancelled: true,
         );
@@ -142,10 +156,12 @@ class DownloadService {
         return cancelProgress;
       } else if (result.status == TaskStatus.paused) {
         // Do NOT cleanup — keep task in _activeTasks so resume can find it.
-        // The controller is also kept alive so resume can re-drive progress.
+        // Use the authoritative progress ratio for the paused byte position.
+        final ratio = _lastProgressRatio[model.id] ?? 0.0;
+        final pausedBytes = (ratio * totalBytes).toInt();
         return DownloadProgress(
-          bytesDownloaded: _lastBytes[model.id] ?? 0,
-          totalBytes: model.sizeBytes,
+          bytesDownloaded: pausedBytes,
+          totalBytes: totalBytes,
           speedBytesPerSecond: 0,
           isPaused: true,
         );
@@ -187,6 +203,7 @@ class DownloadService {
     _lastUpdateTime.clear();
     _lastBytes.clear();
     _smoothedSpeed.clear();
+    _lastProgressRatio.clear();
   }
 
   void _cleanup(String modelId) {
@@ -195,5 +212,6 @@ class DownloadService {
     _lastUpdateTime.remove(modelId);
     _lastBytes.remove(modelId);
     _smoothedSpeed.remove(modelId);
+    _lastProgressRatio.remove(modelId);
   }
 }
