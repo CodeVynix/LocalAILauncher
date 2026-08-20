@@ -82,10 +82,13 @@ class DownloadService {
           if (bytesDownloaded > totalBytes) bytesDownloaded = totalBytes;
           _lastBytes[model.id] = bytesDownloaded;
 
-          // Store the authoritative progress ratio from the package.
-          // This is always fresh from background_downloader's own state
-          // and is used as the source of truth at pause time.
-          _lastProgressRatio[model.id] = progress;
+          // Only store the progress ratio when it's a valid [0.0, 1.0] value.
+          // background_downloader emits a sentinel of -5.0 at the exact
+          // moment pause fires — overwriting a real ratio with that would
+          // show 0.0 MB to the user, so we ignore invalid values entirely.
+          if (progress >= 0.0 && progress <= 1.0) {
+            _lastProgressRatio[model.id] = progress;
+          }
 
           final lastTime = _lastUpdateTime[model.id] ?? now;
           final deltaMs = now.difference(lastTime).inMilliseconds;
@@ -114,7 +117,6 @@ class DownloadService {
             final clampedRatio = rawRatio.clamp(0.0, 1.0);
             final pausedBytes = (clampedRatio * totalBytes).toInt();
             final safeBytes = pausedBytes.clamp(0, totalBytes);
-            print('[DownloadService] paused (onStatus): rawRatio=$rawRatio, clampedRatio=$clampedRatio, pausedBytes=$pausedBytes, safeBytes=$safeBytes, totalBytes=$totalBytes');
             final pausedProgress = DownloadProgress(
               bytesDownloaded: safeBytes,
               totalBytes: totalBytes,
@@ -159,7 +161,6 @@ class DownloadService {
         final clampedRatio = rawRatio.clamp(0.0, 1.0);
         final pausedBytes = (clampedRatio * totalBytes).toInt();
         final safeBytes = pausedBytes.clamp(0, totalBytes);
-        print('[DownloadService] paused (result): rawRatio=$rawRatio, clampedRatio=$clampedRatio, pausedBytes=$pausedBytes, safeBytes=$safeBytes, totalBytes=$totalBytes');
         return DownloadProgress(
           bytesDownloaded: safeBytes,
           totalBytes: totalBytes,

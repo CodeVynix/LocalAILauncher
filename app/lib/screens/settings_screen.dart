@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/model_info.dart';
 import '../providers/settings_provider.dart';
 import '../providers/model_provider.dart';
+import '../providers/download_provider.dart';
 import '../services/shelf_server.dart';
 import '../services/device_service.dart';
 import '../services/recommended_models.dart';
@@ -37,6 +38,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       getDeviceInfo: () => DeviceService.getDeviceInfo(),
       getRecommendedModels: (ramGb) =>
           RecommendedModels.getRecommendedForDevice(ramGb),
+      onDownloadModel: (model, onProgress) async {
+        final result = await ref
+            .read(downloadServiceProvider)
+            .downloadModel(model, onProgress);
+
+        if (result.bytesDownloaded > 0 &&
+            !result.isCancelled &&
+            !result.isPaused) {
+          final modelsDir = await _getModelsDirectory();
+          final localPath = '${modelsDir.path}/${model.fileName}';
+          final downloadedFile = File(localPath);
+          if (await downloadedFile.exists()) {
+            await ref
+                .read(modelListProvider.notifier)
+                .addModel(model, localPath);
+          }
+        }
+
+        return result;
+      },
       onImportGguf: (path, fileName) async {
         final validation = await GgufValidator.validateFile(path);
         if (!validation.isValid) return false;

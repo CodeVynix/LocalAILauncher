@@ -720,7 +720,7 @@ class ShelfServerService {
       <div class="hw-section">
         <h3>Local Web Server</h3>
         <div class="server-toggle">
-          <span>Serve the app as a webpage on your local network</span>
+          <span>Web Server</span>
           <div class="toggle-switch on" onclick="this.classList.toggle('on')"></div>
         </div>
         <div class="url-box" id="serverUrl" style="display:none"></div>

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/chat_provider.dart';
 import '../providers/model_provider.dart';
+import '../providers/tab_provider.dart';
 import '../widgets/chat_bubble.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -51,7 +52,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton.icon(
-                  onPressed: () {},
+                  onPressed: () {
+                    ref.read(currentTabProvider.notifier).state = 1;
+                  },
                   icon: const Icon(Icons.download),
                   label: const Text('Go to Download'),
                 ),
