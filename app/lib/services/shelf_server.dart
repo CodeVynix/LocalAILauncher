@@ -38,7 +38,7 @@ class ShelfServerService {
     // Health check: confirm the server is actually accepting connections
     // before returning to the caller, so the URL is only displayed after
     // the server is proven reachable.
-    await _healthCheck(port);
+    await _healthCheck(_server!.port);
   }
 
   Future<void> _healthCheck(int port) async {
@@ -69,7 +69,7 @@ class ShelfServerService {
     if (_wifiIp != null && _wifiIp!.isNotEmpty) {
       return 'http://$_wifiIp:$port';
     }
-    return null;
+    return 'http://127.0.0.1:$port';
   }
 
   shelf.Response _handleIndex(shelf.Request request) {
