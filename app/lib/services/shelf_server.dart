@@ -7,6 +7,7 @@ import 'package:shelf_router/shelf_router.dart';
 import '../models/model_info.dart';
 import '../models/device_info.dart';
 import '../services/download_service.dart';
+import '../services/recommended_models.dart';
 
 class ShelfServerService {
   HttpServer? _server;
@@ -124,7 +125,9 @@ class ShelfServerService {
     final message = json['message'] as String? ?? '';
 
     if (message.isEmpty) {
-      return shelf.Response.badRequest(body: 'Message is required');
+      return shelf.Response.badRequest(
+          body: jsonEncode({'error': 'Message is required'}),
+          headers: {'content-type': 'application/json'});
     }
 
     await _onSendMessage(message);
@@ -161,7 +164,9 @@ class ShelfServerService {
         headers: {'content-type': 'application/json'},
       );
     } catch (e) {
-      return shelf.Response.internalServerError(body: '$e');
+      return shelf.Response.internalServerError(
+          body: jsonEncode({'error': '$e'}),
+          headers: {'content-type': 'application/json'});
     }
   }
 
@@ -179,7 +184,9 @@ class ShelfServerService {
         headers: {'content-type': 'application/json'},
       );
     } catch (e) {
-      return shelf.Response.internalServerError(body: '$e');
+      return shelf.Response.internalServerError(
+          body: jsonEncode({'error': '$e'}),
+          headers: {'content-type': 'application/json'});
     }
   }
 
@@ -189,7 +196,8 @@ class ShelfServerService {
   Future<shelf.Response> _handleDownloadModel(
       shelf.Request request) async {
     if (_onDownloadModel == null) {
-      return shelf.Response.ok(jsonEncode({'error': 'Download not available'}),
+      return shelf.Response.ok(
+          jsonEncode({'error': 'Download not available'}),
           headers: {'content-type': 'application/json'});
     }
     final body = await request.readAsString();
@@ -197,20 +205,34 @@ class ShelfServerService {
     final modelId = json['modelId'] as String?;
 
     if (modelId == null || modelId.isEmpty) {
-      return shelf.Response.badRequest(body: 'modelId is required');
+      return shelf.Response.badRequest(
+          body: jsonEncode({'error': 'modelId is required'}),
+          headers: {'content-type': 'application/json'});
     }
 
-    // Find the model in the recommended or all models list
-    final allModels = _getModels();
+    // Search downloaded models first, then the full recommended catalog
+    final downloadedModels = _getModels();
     ModelInfo? model;
     try {
-      model = allModels.firstWhere((m) => m.id == modelId);
+      model = downloadedModels.firstWhere((m) => m.id == modelId);
     } catch (_) {
-      return shelf.Response.notFound('Model not found: $modelId');
+      // Not in downloaded list — search the full recommended catalog
+      final catalogMatch =
+          RecommendedModels.models.where((m) => m.id == modelId);
+      if (catalogMatch.isNotEmpty) {
+        model = catalogMatch.first;
+      }
+    }
+
+    if (model == null) {
+      return shelf.Response.notFound(
+          jsonEncode({'error': 'Model not found: $modelId'}),
+          headers: {'content-type': 'application/json'});
     }
 
     if (model.isDownloaded) {
-      return shelf.Response.ok(jsonEncode({'status': 'already_downloaded'}),
+      return shelf.Response.ok(
+          jsonEncode({'status': 'already_downloaded'}),
           headers: {'content-type': 'application/json'});
     }
 
@@ -266,7 +288,9 @@ class ShelfServerService {
 
     final contentType = request.headers['content-type'] ?? '';
     if (!contentType.contains('multipart/form-data')) {
-      return shelf.Response.badRequest(body: 'Expected multipart/form-data');
+      return shelf.Response.badRequest(
+          body: jsonEncode({'error': 'Expected multipart/form-data'}),
+          headers: {'content-type': 'application/json'});
     }
 
     try {
@@ -283,7 +307,9 @@ class ShelfServerService {
       final fileNameMatch =
           RegExp(r'filename="([^"]+)"').firstMatch(bodyStr);
       if (fileNameMatch == null) {
-        return shelf.Response.badRequest(body: 'No file provided');
+        return shelf.Response.badRequest(
+            body: jsonEncode({'error': 'No file provided'}),
+            headers: {'content-type': 'application/json'});
       }
       final fileName = fileNameMatch.group(1)!;
 
@@ -300,7 +326,9 @@ class ShelfServerService {
         }
       }
       if (dataStart == -1) {
-        return shelf.Response.badRequest(body: 'Invalid multipart data');
+        return shelf.Response.badRequest(
+            body: jsonEncode({'error': 'Invalid multipart data'}),
+            headers: {'content-type': 'application/json'});
       }
 
       // Find closing boundary: "--<boundary>--"
@@ -346,7 +374,9 @@ class ShelfServerService {
             headers: {'content-type': 'application/json'});
       }
     } catch (e) {
-      return shelf.Response.internalServerError(body: '$e');
+      return shelf.Response.internalServerError(
+          body: jsonEncode({'error': '$e'}),
+          headers: {'content-type': 'application/json'});
     }
   }
 
