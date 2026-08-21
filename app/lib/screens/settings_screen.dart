@@ -85,6 +85,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             .addModel(model, localPath);
         return true;
       },
+      onPauseDownload: (modelId) {
+        ref.read(downloadServiceProvider).pauseDownload(modelId);
+      },
+      onResumeDownload: (modelId) {
+        ref.read(downloadServiceProvider).resumeDownload(modelId);
+      },
+      onCancelDownload: (modelId) {
+        ref.read(downloadServiceProvider).cancelDownload();
+      },
     );
     _loadHardwareInfo();
   }

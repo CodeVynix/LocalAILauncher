@@ -23,6 +23,9 @@ class ShelfServerService {
   )? _onDownloadModel;
   final Future<bool> Function(String path, String fileName)?
       _onImportGguf;
+  final void Function(String modelId)? _onPauseDownload;
+  final void Function(String modelId)? _onResumeDownload;
+  final void Function(String modelId)? _onCancelDownload;
 
   ShelfServerService({
     required List<ModelInfo> Function() getModels,
@@ -35,13 +38,19 @@ class ShelfServerService {
       Function(DownloadProgress) onProgress,
     )? onDownloadModel,
     Future<bool> Function(String path, String fileName)? onImportGguf,
+    void Function(String modelId)? onPauseDownload,
+    void Function(String modelId)? onResumeDownload,
+    void Function(String modelId)? onCancelDownload,
   })  : _getModels = getModels,
         _getChatHistory = getChatHistory,
         _onSendMessage = onSendMessage,
         _getDeviceInfo = getDeviceInfo,
         _getRecommendedModels = getRecommendedModels,
         _onDownloadModel = onDownloadModel,
-        _onImportGguf = onImportGguf;
+        _onImportGguf = onImportGguf,
+        _onPauseDownload = onPauseDownload,
+        _onResumeDownload = onResumeDownload,
+        _onCancelDownload = onCancelDownload;
 
   Future<void> start(int port, {String? wifiIp}) async {
     _wifiIp = wifiIp;
@@ -57,6 +66,9 @@ class ShelfServerService {
     router.get('/api/recommended-models', _handleRecommendedModels);
     router.post('/api/download-model', _handleDownloadModel);
     router.get('/api/download-progress/<modelId>', _handleDownloadProgress);
+    router.post('/api/pause-download', _handlePauseDownload);
+    router.post('/api/resume-download', _handleResumeDownload);
+    router.post('/api/cancel-download', _handleCancelDownload);
     router.post('/api/import-gguf', _handleImportGguf);
 
     final handler = const shelf.Pipeline()
@@ -277,6 +289,67 @@ class ShelfServerService {
       }),
       headers: {'content-type': 'application/json'},
     );
+  }
+
+  Future<shelf.Response> _handlePauseDownload(
+      shelf.Request request) async {
+    if (_onPauseDownload == null) {
+      return shelf.Response.ok(
+          jsonEncode({'error': 'Pause not available'}),
+          headers: {'content-type': 'application/json'});
+    }
+    final body = await request.readAsString();
+    final json = jsonDecode(body) as Map<String, dynamic>;
+    final modelId = json['modelId'] as String?;
+    if (modelId == null || modelId.isEmpty) {
+      return shelf.Response.badRequest(
+          body: jsonEncode({'error': 'modelId is required'}),
+          headers: {'content-type': 'application/json'});
+    }
+    _onPauseDownload(modelId);
+    return shelf.Response.ok(jsonEncode({'status': 'paused'}),
+        headers: {'content-type': 'application/json'});
+  }
+
+  Future<shelf.Response> _handleResumeDownload(
+      shelf.Request request) async {
+    if (_onResumeDownload == null) {
+      return shelf.Response.ok(
+          jsonEncode({'error': 'Resume not available'}),
+          headers: {'content-type': 'application/json'});
+    }
+    final body = await request.readAsString();
+    final json = jsonDecode(body) as Map<String, dynamic>;
+    final modelId = json['modelId'] as String?;
+    if (modelId == null || modelId.isEmpty) {
+      return shelf.Response.badRequest(
+          body: jsonEncode({'error': 'modelId is required'}),
+          headers: {'content-type': 'application/json'});
+    }
+    _onResumeDownload(modelId);
+    return shelf.Response.ok(jsonEncode({'status': 'resumed'}),
+        headers: {'content-type': 'application/json'});
+  }
+
+  Future<shelf.Response> _handleCancelDownload(
+      shelf.Request request) async {
+    if (_onCancelDownload == null) {
+      return shelf.Response.ok(
+          jsonEncode({'error': 'Cancel not available'}),
+          headers: {'content-type': 'application/json'});
+    }
+    final body = await request.readAsString();
+    final json = jsonDecode(body) as Map<String, dynamic>;
+    final modelId = json['modelId'] as String?;
+    if (modelId == null || modelId.isEmpty) {
+      return shelf.Response.badRequest(
+          body: jsonEncode({'error': 'modelId is required'}),
+          headers: {'content-type': 'application/json'});
+    }
+    _onCancelDownload(modelId);
+    _webDownloadProgress.remove(modelId);
+    return shelf.Response.ok(jsonEncode({'status': 'cancelled'}),
+        headers: {'content-type': 'application/json'});
   }
 
   Future<shelf.Response> _handleImportGguf(
@@ -588,6 +661,28 @@ class ShelfServerService {
     .btn-download:hover { background: #B69DF8; }
     .btn-download:disabled { background: var(--md-surface-container-high); color: var(--md-on-surface-variant); cursor: default; }
     .btn-downloaded { background: #2E7D32; color: #fff; cursor: default; }
+    .badge-downloaded {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 6px 14px; border-radius: 16px;
+      background: #2E7D32; color: #fff;
+      font-size: 12px; font-weight: 600;
+    }
+    .badge-downloaded svg { width: 14px; height: 14px; fill: currentColor; }
+
+    .dl-controls {
+      display: flex; gap: 8px; margin-top: 8px;
+    }
+    .dl-controls button {
+      flex: 1; padding: 8px 12px; border: none; border-radius: 16px;
+      cursor: pointer; font-weight: 600; font-size: 12px;
+      transition: background 0.2s;
+    }
+    .btn-pause { background: var(--md-primary); color: var(--md-on-primary); }
+    .btn-pause:hover { background: #B69DF8; }
+    .btn-resume { background: var(--md-primary); color: var(--md-on-primary); }
+    .btn-resume:hover { background: #B69DF8; }
+    .btn-cancel { background: var(--md-error); color: #fff; }
+    .btn-cancel:hover { background: #D32F2F; }
 
     .progress-bar {
       height: 6px; background: var(--md-surface-container-lowest);
@@ -619,21 +714,6 @@ class ShelfServerService {
     .server-toggle {
       display: flex; align-items: center; justify-content: space-between;
       padding: 12px 0; color: var(--md-on-surface);
-    }
-    .toggle-switch {
-      width: 52px; height: 32px; border-radius: 16px;
-      background: var(--md-surface-container-highest);
-      border: 2px solid var(--md-outline); position: relative;
-      cursor: pointer; transition: background 0.3s, border-color 0.3s;
-    }
-    .toggle-switch.on { background: var(--md-primary); border-color: var(--md-primary); }
-    .toggle-switch::after {
-      content: ''; position: absolute; width: 24px; height: 24px;
-      border-radius: 50%; background: var(--md-outline); top: 2px; left: 2px;
-      transition: transform 0.3s, background 0.3s;
-    }
-    .toggle-switch.on::after {
-      transform: translateX(20px); background: var(--md-on-primary);
     }
     .url-box {
       margin-top: 10px; padding: 12px; border-radius: 12px;
@@ -747,13 +827,9 @@ class ShelfServerService {
           <span>1.5 — Random / Creative</span>
         </div>
       </div>
-      <div class="hw-section">
-        <h3>Local Web Server</h3>
-        <div class="server-toggle">
-          <span>Web Server</span>
-          <div class="toggle-switch on" onclick="this.classList.toggle('on')"></div>
-        </div>
-        <div class="url-box" id="serverUrl" style="display:none"></div>
+      <div class="hw-section" id="serverInfoSection" style="display:none">
+        <h3>Web Server</h3>
+        <div class="url-box" id="serverUrl"></div>
       </div>
     </div>
   </div>
@@ -761,6 +837,7 @@ class ShelfServerService {
   <script>
     /* ── Model availability state ── */
     var _hasDownloadedModel = false;
+    var _downloadTabRendered = false;
 
     /* ── Tab switching ── */
     function switchTab(name) {
@@ -769,7 +846,13 @@ class ShelfServerService {
       var idx = name === 'chat' ? 0 : (name === 'download' ? 1 : 2);
       document.querySelectorAll('.tab')[idx].classList.add('active');
       document.getElementById(name + '-tab').classList.add('active');
-      if (name === 'download') { loadDeviceInfo(); loadRecommendedModels(); }
+      if (name === 'download') {
+        loadDeviceInfo();
+        if (!_downloadTabRendered || Object.keys(activePolls).length === 0) {
+          loadRecommendedModels();
+          _downloadTabRendered = true;
+        }
+      }
       if (name === 'settings') loadDeviceInfo();
       if (name === 'chat') refreshChatState();
     }
@@ -838,6 +921,7 @@ class ShelfServerService {
 
     /* ── Recommended Models ── */
     var activePolls = {};
+    var _savedDownloadHTML = '';
     async function loadRecommendedModels() {
       try {
         var res = await fetch('/api/recommended-models');
@@ -847,6 +931,7 @@ class ShelfServerService {
           el.innerHTML = '<p style="color:var(--md-on-surface-variant);padding:16px">No recommended models for your device.</p>';
           return;
         }
+        _savedDownloadHTML = el.innerHTML;
         el.innerHTML = models.map(function(m) { return renderModelCard(m); }).join('');
       } catch (e) { console.error('Failed to load models', e); }
     }
@@ -861,7 +946,7 @@ class ShelfServerService {
         '</span>';
       var meta = m.paramCount + ' params \u00B7 ' + m.size + ' \u00B7 ' + m.quantization;
       var btn = m.isDownloaded
-        ? '<button class="btn btn-downloaded" disabled>Downloaded</button>'
+        ? '<span class="badge-downloaded"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Downloaded</span>'
         : '<button class="btn btn-download" onclick="startDownload(\'' + m.id + '\', this)">Download</button>';
       return '<div class="model-card" id="card-' + m.id + '">' +
         '<h3>' + m.name + '</h3>' +
@@ -885,8 +970,8 @@ class ShelfServerService {
         });
         var data = await res.json();
         if (data.status === 'already_downloaded') {
-          btnEl.textContent = 'Downloaded';
-          btnEl.className = 'btn btn-downloaded';
+          btnEl.textContent = '';
+          btnEl.outerHTML = '<span class="badge-downloaded"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Downloaded</span>';
           return;
         }
         if (data.error) {
@@ -901,8 +986,13 @@ class ShelfServerService {
           '<div class="progress-info">' +
             '<span id="prog-text-' + modelId + '">0.0 MB / 0.00 GB</span>' +
             '<span id="prog-speed-' + modelId + '">0.0 MB/s</span>' +
+          '</div>' +
+          '<div class="dl-controls" id="controls-' + modelId + '">' +
+            '<button class="btn-pause" id="pauseBtn-' + modelId + '" onclick="pauseDownload(\'' + modelId + '\')">Pause</button>' +
+            '<button class="btn-cancel" onclick="cancelDownload(\'' + modelId + '\')">Cancel</button>' +
           '</div>';
         btnEl.textContent = 'Downloading...';
+        btnEl.disabled = true;
         pollProgress(modelId, btnEl);
       } catch (e) {
         btnEl.disabled = false;
@@ -921,20 +1011,43 @@ class ShelfServerService {
           var fill = document.getElementById('fill-' + modelId);
           var txt = document.getElementById('prog-text-' + modelId);
           var spd = document.getElementById('prog-speed-' + modelId);
+          var ctrl = document.getElementById('controls-' + modelId);
           if (fill) fill.style.width = (p.progress * 100).toFixed(1) + '%';
           if (txt) txt.textContent = p.display;
           if (spd) spd.textContent = p.speedDisplay;
+          if (ctrl) {
+            var pauseBtn = document.getElementById('pauseBtn-' + modelId);
+            if (p.isPaused) {
+              ctrl.innerHTML =
+                '<button class="btn-resume" onclick="resumeDownload(\'' + modelId + '\')">Resume</button>' +
+                '<button class="btn-cancel" onclick="cancelDownload(\'' + modelId + '\')">Cancel</button>';
+            } else {
+              ctrl.innerHTML =
+                '<button class="btn-pause" id="pauseBtn-' + modelId + '" onclick="pauseDownload(\'' + modelId + '\')">Pause</button>' +
+                '<button class="btn-cancel" onclick="cancelDownload(\'' + modelId + '\')">Cancel</button>';
+            }
+          }
           if (p.isCancelled) {
             stopPoll(modelId);
-            btnEl.textContent = 'Download';
-            btnEl.disabled = false;
+            var card = document.getElementById('card-' + modelId);
+            if (card) {
+              var progEl = document.getElementById('progress-' + modelId);
+              if (progEl) progEl.innerHTML = '';
+              var btnArea = card.querySelector('.btn-cancel, .badge-downloaded');
+              if (btnArea && btnArea.parentElement) {
+                btnArea.outerHTML = '<button class="btn btn-download" onclick="startDownload(\'' + modelId + '\', this)">Download</button>';
+              }
+            }
           }
           if (!p.isPaused && p.progress >= 1.0) {
             stopPoll(modelId);
-            btnEl.textContent = 'Downloaded';
-            btnEl.className = 'btn btn-downloaded';
-            var progEl = document.getElementById('progress-' + modelId);
-            if (progEl) progEl.innerHTML = '';
+            var card = document.getElementById('card-' + modelId);
+            if (card) {
+              var progEl = document.getElementById('progress-' + modelId);
+              if (progEl) progEl.innerHTML = '';
+              var dlBtn = card.querySelector('.btn-download, .btn-downloaded');
+              if (dlBtn) dlBtn.outerHTML = '<span class="badge-downloaded"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Downloaded</span>';
+            }
             showSnackbar(modelId.replace(/-/g, ' ') + ' is ready to use', 'success');
           }
         } catch (e) { stopPoll(modelId); }
@@ -946,6 +1059,37 @@ class ShelfServerService {
         clearInterval(activePolls[modelId]);
         delete activePolls[modelId];
       }
+    }
+
+    /* ── Download controls ── */
+    async function pauseDownload(modelId) {
+      try {
+        await fetch('/api/pause-download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ modelId: modelId })
+        });
+      } catch (e) { console.error('Pause failed', e); }
+    }
+
+    async function resumeDownload(modelId) {
+      try {
+        await fetch('/api/resume-download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ modelId: modelId })
+        });
+      } catch (e) { console.error('Resume failed', e); }
+    }
+
+    async function cancelDownload(modelId) {
+      try {
+        await fetch('/api/cancel-download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ modelId: modelId })
+        });
+      } catch (e) { console.error('Cancel failed', e); }
     }
 
     /* ── GGUF Import ── */

@@ -113,12 +113,35 @@ class ModelCard extends StatelessWidget {
             else
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: model.isDownloaded ? null : onDownload,
-                  child: Text(
-                    model.isDownloaded ? 'Downloaded' : 'Download',
-                  ),
-                ),
+                child: model.isDownloaded
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2E7D32),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.check, size: 16, color: Colors.white),
+                            SizedBox(width: 6),
+                            Text(
+                              'Downloaded',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ElevatedButton(
+                        onPressed: onDownload,
+                        child: const Text('Download'),
+                      ),
               ),
           ],
         ),
