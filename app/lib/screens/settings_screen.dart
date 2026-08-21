@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/model_info.dart';
 import '../providers/settings_provider.dart';
 import '../providers/model_provider.dart';
+import '../providers/model_selection_provider.dart';
 import '../providers/download_provider.dart';
 import '../services/shelf_server.dart';
 import '../services/device_service.dart';
@@ -441,8 +442,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         IconButton(
                           icon: const Icon(Icons.check_circle_outline),
                           onPressed: () {
-                            ref.read(selectedModelProvider.notifier).state =
-                                model;
+                            ref
+                                .read(selectedModelProvider.notifier)
+                                .selectModel(model);
                           },
                         ),
                       IconButton(

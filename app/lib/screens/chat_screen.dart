@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/chat_provider.dart';
 import '../providers/model_provider.dart';
+import '../providers/model_selection_provider.dart';
 import '../providers/tab_provider.dart';
 import '../widgets/chat_bubble.dart';
 
@@ -33,8 +34,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final messages = ref.watch(chatMessagesProvider);
     final selectedModel = ref.watch(selectedModelProvider);
     final isGenerating = ref.watch(isGeneratingProvider);
+    final models = ref.watch(modelListProvider);
 
-    if (selectedModel == null) {
+    if (models.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('Chat')),
         body: Center(
@@ -65,9 +67,67 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       );
     }
 
+    if (models.length >= 2 && selectedModel == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Chat')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.tune, size: 64, color: Colors.blue),
+                const SizedBox(height: 16),
+                const Text(
+                  'Select your local model',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Multiple models are available. Choose one to start chatting.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(height: 24),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 320),
+                  child: DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                    ),
+                    hint: const Text('Select a model'),
+                    items: models
+                        .map(
+                          (m) => DropdownMenuItem(
+                            value: m.id,
+                            child: Text(m.name, overflow: TextOverflow.ellipsis),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (modelId) {
+                      if (modelId == null) return;
+                      final model = models.firstWhere((m) => m.id == modelId);
+                      ref
+                          .read(selectedModelProvider.notifier)
+                          .selectModel(model);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(selectedModel.name),
+        title: Text(selectedModel!.name),
         actions: [
           if (isGenerating)
             IconButton(

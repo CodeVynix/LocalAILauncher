@@ -9,8 +9,6 @@ final modelListProvider =
   (ref) => ModelListNotifier(),
 );
 
-final selectedModelProvider = StateProvider<ModelInfo?>((ref) => null);
-
 class ModelListNotifier extends StateNotifier<List<ModelInfo>> {
   ModelListNotifier() : super([]) {
     _loadModels();

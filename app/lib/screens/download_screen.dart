@@ -10,6 +10,7 @@ import '../services/recommended_models.dart';
 import '../services/gguf_validator.dart';
 import '../services/notification_service.dart';
 import '../providers/model_provider.dart';
+import '../providers/model_selection_provider.dart';
 import '../services/download_service.dart';
 import '../providers/download_provider.dart';
 import '../widgets/model_card.dart';
@@ -206,25 +207,63 @@ class _DownloadScreenState extends ConsumerState<DownloadScreen>
       return const Center(child: CircularProgressIndicator());
     }
 
+    final models = ref.watch(modelListProvider);
+    final selectedModel = ref.watch(selectedModelProvider);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          child: Row(
-            children: [
-              const Icon(Icons.info_outline),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Device: ${_deviceInfo!.roundedRamGb}GB RAM (${_deviceInfo!.hardwareTier}), ${_deviceInfo!.cpuCores} CPU cores',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+        if (models.length >= 2)
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: Row(
+              children: [
+                const Icon(Icons.tune),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    value: selectedModel?.id,
+                    underline: const SizedBox.shrink(),
+                    hint: const Text('Select a model'),
+                    items: models
+                        .map(
+                          (m) => DropdownMenuItem(
+                            value: m.id,
+                            child: Text(m.name, overflow: TextOverflow.ellipsis),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (modelId) {
+                      if (modelId == null) return;
+                      final model = models.firstWhere((m) => m.id == modelId);
+                      ref
+                          .read(selectedModelProvider.notifier)
+                          .selectModel(model);
+                    },
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
+          )
+        else
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Device: ${_deviceInfo!.roundedRamGb}GB RAM (${_deviceInfo!.hardwareTier}), ${_deviceInfo!.cpuCores} CPU cores',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
         Expanded(
           child: _recommendedModels.isEmpty
               ? const Center(

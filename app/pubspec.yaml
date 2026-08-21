@@ -26,6 +26,7 @@ dependencies:
   background_downloader: ^9.5.8
   flutter_local_notifications: ^22.3.0
   disk_usage: ^1.0.0
+  shared_preferences: ^2.5.3
 
 dev_dependencies:
   flutter_test:
